@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1200, initial-scale=1.0">
+    <title>20-Button Concertina App</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg: white;
+            --key-white: white;
+            --key-black: #333;
+            --btn-push: #ffcccc; /* 薄い赤 */
+            --btn-pull: #cce5ff; /* 薄い青 */
+            --active-push: #ff0000;
+            --active-pull: #0000ff;
+            --border: #ccc;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 20px; font-size: 24px; }
+
+        /* --- コンサーティーナ本体 --- */
+        .concertina-container {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 20px;
+        }
+
+        .hand-panel {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .hand-title { font-weight: bold; margin-bottom: 10px; }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            gap: 10px;
+        }
+
+        .c-btn {
+            width: 50px;
+            height: 50px;
+            background-color: #e0e0e0;
+            border: 1px solid #999;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+        }
+
+        .c-btn.push { background-color: var(--active-push); color: white; border-color: darkred; }
+        .c-btn.pull { background-color: var(--active-pull); color: white; border-color: darkblue; }
+
+        /* --- コントロールエリア --- */
+        .controls-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+            height: 350px;
+            margin-bottom: 20px;
+        }
+
+        /* パターンリスト */
+        .pattern-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pattern-list-box {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            overflow-y: auto;
+            padding: 5px;
+            background: white;
+        }
+        .pattern-list-box.push-box { background-color: #fff0f0; }
+        .pattern-list-box.pull-box { background-color: #f0f8ff; }
+
+        .pattern-header { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
+
+        .pat-btn {
+            display: block;
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 2px;
+            text-align: left;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .pat-btn:hover { background-color: #eee; }
+        .pat-btn.selected { background-color: #ffffcc; border-color: orange; font-weight: bold; }
+
+        /* コードセレクター */
+        .selector-panel {
+            flex: 1.5;
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .radio-group { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .radio-label { margin-right: 10px; font-weight: bold; width: 80px; }
+        .radio-item { display: flex; align-items: center; margin-right: 8px; font-size: 14px; }
+        
+        input[type="radio"] { margin-right: 4px; cursor: pointer; }
+
+        /* --- ピアノ鍵盤 --- */
+        .piano-container {
+            position: relative;
+            background: #333;
+            padding: 10px 10px 0 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .piano-keys {
+            position: relative;
+            height: 120px;
+            display: flex;
+            /* widthはJSで動的に設定しないと黒鍵がはみ出る場合があるが、flexで白鍵を並べるので自動で伸びる */
+        }
+
+        .key {
+            border: 1px solid #000;
+            border-radius: 0 0 3px 3px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 5px;
+            font-size: 10px;
+            cursor: pointer;
+            user-select: none;
+            box-sizing: border-box; /* 枠線を幅に含める */
+        }
+        
+        .key.white {
+            width: 30px;
+            height: 110px;
+            background: white;
+            color: black;
+            z-index: 1;
+        }
+        .key.black {
+            position: absolute;
+            width: 20px;
+            height: 70px;
+            background: #222;
+            color: white;
+            z-index: 2;
+            top: 0;
+        }
+        
+        .key.disabled { background: #555 !important; color: #777 !important; cursor: default; }
+        .key.white.active { background: #ddd !important; }
+        .key.black.active { background: #444 !important; }
+
+        /* --- 通知 --- */
+        #notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 30px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .divider { border-bottom: 1px solid #ddd; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <h1>20-Button Concertina Fingering App</h1>
+
+    <div id="notification">NO FINGERING FOUND<br>(Impossible)</div>
+
+    <div class="concertina-container">
+        <div class="hand-panel">
+            <div class="hand-title">Left Hand</div>
+            <div id="left-grid" class="button-grid"></div>
+        </div>
+        <div class="hand-panel">
+            <div class="hand-title">Right Hand</div>
+            <div id="right-grid" class="button-grid"></div>
+        </div>
+    </div>
+
+    <div class="controls-container">
+        <div class="pattern-panel">
+            <div class="pattern-header">Push Patterns (押し)</div>
+            <div id="push-list" class="pattern-list-box push-box"></div>
+            
+            <div class="pattern-header" style="margin-top: 5px;">Pull Patterns (引き)</div>
+            <div id="pull-list" class="pattern-list-box pull-box"></div>
+        </div>
+
+        <div class="selector-panel">
+            <div class="radio-group" id="root-group">
+                <span class="radio-label">Root:</span>
+                </div>
+            <div class="divider"></div>
+            
+            <div class="radio-group" id="type-group">
+                <span class="radio-label">Type:</span>
+                </div>
+            <div class="divider"></div>
+
+            <div class="radio-group" id="base-group">
+                <span class="radio-label">On Base:</span>
+                </div>
+        </div>
+    </div>
+
+    <h3>Piano Keyboard (C3 - B6)</h3>
+    <div class="piano-container">
+        <div id="piano-wrapper" class="piano-keys"></div>
+    </div>
+
+<script>
+/**
+ * データ定義
+ */
+const DATA = [
+    {side: "Left", no: 1, action: "Push", note: "C3"}, {side: "Left", no: 1, action: "Pull", note: "G3"},
+    {side: "Left", no: 2, action: "Push", note: "G3"}, {side: "Left", no: 2, action: "Pull", note: "B3"},
+    {side: "Left", no: 3, action: "Push", note: "C4"}, {side: "Left", no: 3, action: "Pull", note: "D4"},
+    {side: "Left", no: 4, action: "Push", note: "E4"}, {side: "Left", no: 4, action: "Pull", note: "F4"},
+    {side: "Left", no: 5, action: "Push", note: "G4"}, {side: "Left", no: 5, action: "Pull", note: "A4"},
+    {side: "Left", no: 6, action: "Push", note: "G3"}, {side: "Left", no: 6, action: "Pull", note: "D4"},
+    {side: "Left", no: 7, action: "Push", note: "D4"}, {side: "Left", no: 7, action: "Pull", note: "F#4"},
+    {side: "Left", no: 8, action: "Push", note: "G4"}, {side: "Left", no: 8, action: "Pull", note: "A4"},
+    {side: "Left", no: 9, action: "Push", note: "B4"}, {side: "Left", no: 9, action: "Pull", note: "C5"},
+    {side: "Left", no: 10, action: "Push", note: "D5"}, {side: "Left", no: 10, action: "Pull", note: "E5"},
+    
+    {side: "Right", no: 1, action: "Push", note: "C5"}, {side: "Right", no: 1, action: "Pull", note: "B4"},
+    {side: "Right", no: 2, action: "Push", note: "E5"}, {side: "Right", no: 2, action: "Pull", note: "D5"},
+    {side: "Right", no: 3, action: "Push", note: "G5"}, {side: "Right", no: 3, action: "Pull", note: "F5"},
+    {side: "Right", no: 4, action: "Push", note: "C6"}, {side: "Right", no: 4, action: "Pull", note: "A5"},
+    {side: "Right", no: 5, action: "Push", note: "E6"}, {side: "Right", no: 5, action: "Pull", note: "B5"},
+    {side: "Right", no: 6, action: "Push", note: "G5"}, {side: "Right", no: 6, action: "Pull", note: "F#5"},
+    {side: "Right", no: 7, action: "Push", note: "B5"}, {side: "Right", no: 7, action: "Pull", note: "A5"},
+    {side: "Right", no: 8, action: "Push", note: "D6"}, {side: "Right", no: 8, action: "Pull", note: "C6"},
+    {side: "Right", no: 9, action: "Push", note: "G6"}, {side: "Right", no: 9, action: "Pull", note: "E6"},
+    {side: "Right", no: 10, action: "Push", note: "B6"}, {side: "Right", no: 10, action: "Pull", note: "F#6"},
+];
+
+const EXISTING_NOTES = new Set(DATA.map(d => d.note));
+const ALL_NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+const CHORD_TYPES = {
+    "Major": [0, 4, 7], "Minor": [0, 3, 7],
+    "sus2": [0, 2, 7], "sus4": [0, 5, 7],
+    "7": [0, 4, 7, 10], "M7": [0, 4, 7, 11], "m7": [0, 3, 7, 10],
+    "dim": [0, 3, 6], "aug": [0, 4, 8],
+    "add9": [0, 4, 7, 14], "Power(5)": [0, 7]
+};
+
+// 状態
+let currentRoot = "C";
+let currentType = "Major";
+let currentBase = "None";
+let pushPatterns = [];
+let pullPatterns = [];
+
+/**
+ * 初期化
+ */
+window.onload = function() {
+    initConcertinaButtons();
+    initPiano();
+    initControls();
+    searchFingerings(); // 初期検索
+};
+
+function initConcertinaButtons() {
+    const createBtn = (side, i) => {
+        const d = document.createElement("div");
+        d.className = "c-btn";
+        d.id = `${side}_${i}`;
+        d.textContent = i;
+        return d;
+    };
+
+    const leftGrid = document.getElementById("left-grid");
+    const rightGrid = document.getElementById("right-grid");
+
+    for (let i = 1; i <= 10; i++) leftGrid.appendChild(createBtn("Left", i));
+    for (let i = 1; i <= 10; i++) rightGrid.appendChild(createBtn("Right", i));
+}
+
+function initControls() {
+    const roots = ["C", "D", "E", "F", "F#", "G", "A", "B"];
+    const types1 = ["Major", "Minor", "7", "M7", "m7"];
+    const types2 = ["sus2", "sus4", "add9", "dim", "aug", "Power(5)"];
+    const bases = ["None", ...roots];
+
+    createRadios("root-group", "root", roots, "C");
+    createRadios("type-group", "type", types1.concat(types2), "Major");
+    createRadios("base-group", "base", bases, "None");
+}
+
+function createRadios(containerId, name, values, defValue) {
+    const container = document.getElementById(containerId);
+    values.forEach(val => {
+        const wrapper = document.createElement("label");
+        wrapper.className = "radio-item";
+        
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = name;
+        radio.value = val;
+        if (val === defValue) radio.checked = true;
+        
+        radio.addEventListener("change", (e) => {
+            if (name === "root") currentRoot = e.target.value;
+            if (name === "type") currentType = e.target.value;
+            if (name === "base") currentBase = e.target.value;
+            searchFingerings();
+        });
+
+        wrapper.appendChild(radio);
+        wrapper.appendChild(document.createTextNode(val));
+        container.appendChild(wrapper);
+    });
+}
+
+function initPiano() {
+    const wrapper = document.getElementById("piano-wrapper");
+    const whiteKeys = ["C", "D", "E", "F", "G", "A", "B"];
+    // 黒鍵は「前の白鍵」の右端に位置する。白鍵幅30px, 黒鍵幅20px。
+    // 例: C#(index 1) は C(index 0) の右。 境界は (0+1)*30 = 30px。
+    // 中心を境界に合わせる => left = 30 - (20/2) = 20px。
+    // オフセット値は「黒鍵が乗っている境界線」のインデックス (1=CとDの間)
+    const blackOffsets = {"C#": 1, "D#": 2, "F#": 4, "G#": 5, "A#": 6};
+    
+    // C3 - B6
+    
+    // 白鍵生成
+    for (let oct = 3; oct <= 6; oct++) {
+        whiteKeys.forEach(note => {
+            const fullNote = `${note}${oct}`;
+            const key = document.createElement("div");
+            key.className = `key white ${EXISTING_NOTES.has(fullNote) ? '' : 'disabled'}`;
+            key.textContent = fullNote;
+            key.onclick = () => showNote(fullNote);
+            wrapper.appendChild(key);
+        });
+    }
+
+    // 黒鍵生成
+    for (let oct = 3; oct <= 6; oct++) {
+        const baseLeft = (oct - 3) * (30 * 7); // 30px * 7keys per octave
+        
+        for (const [note, gapIdx] of Object.entries(blackOffsets)) {
+            const fullNote = `${note}${oct}`;
+            const key = document.createElement("div");
+            key.className = `key black ${EXISTING_NOTES.has(fullNote) ? '' : 'disabled'}`;
+            
+            // 計算修正箇所:
+            // gapIdx * 30 で境界線の位置。
+            // そこから黒鍵の半分の幅 (10px) を引くことで中心を合わせる。
+            const left = baseLeft + (gapIdx * 30) - 10;
+            
+            key.style.left = `${left}px`;
+            key.onclick = () => showNote(fullNote);
+            wrapper.appendChild(key);
+        }
+    }
+}
+
+/**
+ * ロジック
+ */
+function resetDisplay() {
+    document.querySelectorAll(".c-btn").forEach(b => {
+        b.classList.remove("push", "pull");
+    });
+    document.getElementById("notification").style.display = "none";
+    document.querySelectorAll(".pat-btn").forEach(b => b.classList.remove("selected"));
+}
+
+function showNote(note) {
+    if (!EXISTING_NOTES.has(note)) return;
+    resetDisplay();
+    DATA.forEach(d => {
+        if (d.note === note) {
+            const btn = document.getElementById(`${d.side}_${d.no}`);
+            btn.classList.add(d.action.toLowerCase());
+        }
+    });
+}
+
+function calculateChordNotes(root, type) {
+    if (!ALL_NOTES.includes(root)) return [];
+    const rootIdx = ALL_NOTES.indexOf(root);
+    const intervals = CHORD_TYPES[type] || [];
+    return intervals.map(i => ALL_NOTES[(rootIdx + i) % 12]);
+}
+
+function searchFingerings() {
+    resetDisplay();
+    let notes = calculateChordNotes(currentRoot, currentType);
+    if (currentBase !== "None") {
+        notes.unshift(currentBase); // ベース音を先頭に
+    }
+
+    if (notes.length === 0) return;
+
+    // 重複除去 (順序維持)
+    let uniqueNotes = [];
+    let seen = new Set();
+    notes.forEach((n, i) => {
+        if (i === 0) { uniqueNotes.push(n); } // ベース音は必ず入れる
+        else if (!seen.has(n)) { uniqueNotes.push(n); seen.add(n); }
+    });
+    const targetNotes = uniqueNotes;
+
+    pushPatterns = findCombinations(targetNotes, "Push");
+    pullPatterns = findCombinations(targetNotes, "Pull");
+
+    updatePatternList("push-list", pushPatterns, "Push");
+    updatePatternList("pull-list", pullPatterns, "Pull");
+
+    if (pushPatterns.length > 0) displayPattern(pushPatterns[0], 0, "Push");
+    else if (pullPatterns.length > 0) displayPattern(pullPatterns[0], 0, "Pull");
+    else document.getElementById("notification").style.display = "block";
+}
+
+function findCombinations(notes, action) {
+    // 1. 各音ごとの候補ボタンを探す
+    const candidates = notes.map(n => 
+        DATA.filter(d => d.note.replace(/[0-9]/g, '') === n && d.action === action)
+    );
+
+    // 候補がない音があれば終了
+    if (candidates.some(c => c.length === 0)) return [];
+
+    // 2. 直積 (Cartesian Product)
+    const combos = cartesian(candidates);
+    
+    // 3. 条件フィルタ
+    const validCombos = [];
+    combos.forEach(combo => {
+        // 条件1: ルート(ベース)は左手
+        if (combo[0].side !== "Left") return;
+
+        // 条件2: 各手2音まで
+        // 重複ボタン排除
+        const uniqueSet = new Set(combo.map(b => `${b.side}_${b.no}`));
+        let leftCount = 0;
+        let rightCount = 0;
+        
+        uniqueSet.forEach(id => {
+            if (id.startsWith("Left")) leftCount++;
+            else rightCount++;
+        });
+
+        if (leftCount <= 2 && rightCount <= 2) {
+            validCombos.push({ action: action, buttons: combo });
+        }
+    });
+    return validCombos;
+}
+
+// ヘルパー: 配列の直積
+function cartesian(args) {
+    var r = [], max = args.length-1;
+    function helper(arr, i) {
+        for (var j=0, l=args[i].length; j<l; j++) {
+            var a = arr.slice(0); // clone
+            a.push(args[i][j]);
+            if (i==max) r.push(a);
+            else helper(a, i+1);
+        }
+    }
+    helper([], 0);
+    return r;
+}
+
+/**
+ * UI更新
+ */
+function updatePatternList(elementId, patterns, type) {
+    const list = document.getElementById(elementId);
+    list.innerHTML = "";
+    if (patterns.length === 0) {
+        const div = document.createElement("div");
+        div.textContent = "(None)";
+        div.style.color = "#999";
+        div.style.padding = "5px";
+        list.appendChild(div);
+        return;
+    }
+
+    patterns.forEach((pat, i) => {
+        const btn = document.createElement("div");
+        btn.className = "pat-btn";
+        btn.id = `pat-${type}-${i}`;
+        btn.textContent = `Pattern ${i+1}`;
+        btn.onclick = () => displayPattern(pat, i, type);
+        list.appendChild(btn);
+    });
+}
+
+function displayPattern(pattern, index, type) {
+    resetDisplay();
+    
+    // リストのハイライト
+    const btn = document.getElementById(`pat-${type}-${index}`);
+    if (btn) btn.classList.add("selected");
+
+    const colorClass = type === "Push" ? "push" : "pull";
+    pattern.buttons.forEach(b => {
+        const el = document.getElementById(`${b.side}_${b.no}`);
+        el.classList.add(colorClass);
+    });
+}
+</script>
+
+</body>
+</html>
